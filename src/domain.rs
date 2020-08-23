@@ -1,13 +1,14 @@
 use std::marker::PhantomData;
 use std::str::FromStr;
-use std::fmt::Display;
+use std::fmt::{Display, Debug};
+use std::hash::Hash;
 
 use strum::{IntoEnumIterator, ParseError};
 
 use super::error::{Result, Error};
 use super::value::{Datatype, Value};
 
-pub trait DomainEnum: IntoEnumIterator + Copy + FromStr + Display {}
+pub trait DomainEnum: IntoEnumIterator + Copy + Hash + Eq + FromStr + Display + Debug {}
 
 pub trait Property: DomainEnum {
     fn name(&self) -> &'static str;

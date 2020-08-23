@@ -4,7 +4,7 @@ use domain_query::{domain, value};
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use strum_macros::{EnumIter, EnumString};
 
-#[derive(PartialEq, Clone, Copy, Debug, EnumIter, EnumString)]
+#[derive(PartialEq, Clone, Copy, Hash, Eq, Debug, EnumIter, EnumString)]
 enum Property {
     #[strum(serialize="AlbumName", serialize="albumname", serialize="album_name")]
     AlbumName,
@@ -34,7 +34,7 @@ impl domain::Property for Property {
     }
 }
 
-#[derive(PartialEq, Clone, Copy, Debug, EnumIter, EnumString)]
+#[derive(PartialEq, Clone, Copy, Hash, Eq, Debug, EnumIter, EnumString)]
 enum Entity {
     Album,
     Track,
