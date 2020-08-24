@@ -143,6 +143,8 @@ impl<Pid: Property> Expression<Pid> {
                     self.display(Some(rhs))
                 ),
             }
+        } else if rootref == 0 && self.ops.is_empty() {
+            format!("<empty>")
         } else {
             format!("<badref: {0}/{1}>", rootref, last)
         }
@@ -162,7 +164,7 @@ impl<Pid: Property> Expression<Pid> {
         } else {
             Err(Error::ExpressionOutOfBounds(
                 op,
-                self.last()?,
+                self.last().unwrap_or(0),
                 self.display(None),
             ))
         }
@@ -450,6 +452,28 @@ mod test {
     }
 
     #[test]
+    fn expression_outofbounds() {
+        let mut expr = Expression::<Property>::new();
+
+        let result = expr.not(99);
+        assert!(
+            matches!(result, Err(Error::ExpressionOutOfBounds(s, e, _)) if s == 99 && e == 0),
+            "{:?}",
+            result
+        );
+
+        expr.constant(true).unwrap();
+        expr.constant(false).unwrap();
+
+        let result = expr.not(99);
+        assert!(
+            matches!(result, Err(Error::ExpressionOutOfBounds(s, e, _)) if s == 99 && e == 1),
+            "{:?}",
+            result
+        );
+    }
+
+    #[test]
     fn expression_eval_success_no_variables() {
         let mut expr = Expression::<Property>::new();
 
@@ -508,9 +532,71 @@ mod test {
         );
     }
 
+    #[test]
+    fn expression_eval_success_partial_no_vars() {
+        let mut expr = Expression::<Property>::new();
+
+        let a = expr.is(Property::Int, Value::Int(42)).unwrap();
+        let b = expr.constant(true).unwrap();
+        let _ = expr.or(a, b).unwrap();
+
+        let requested = expr.variables().requested().map(|v| *v).collect::<Vec<_>>();
+        assert_eq!(requested, vec![Property::Int]);
+
+        let result = expr.eval(&Context::empty());
+        assert!(matches!(result, Ok(Evaluated::Partially(_))));
+
+        if let Ok(Evaluated::Partially(partexpr)) = result {
+            let requested = partexpr
+                .variables()
+                .requested()
+                .map(|v| *v)
+                .collect::<Vec<_>>();
+            assert_eq!(requested, vec![Property::Int]);
+        }
+    }
+
+    #[test]
+    fn expression_eval_success_partial_some_vars() {
+        let mut expr = Expression::<Property>::new();
+
+        let a = expr.is(Property::Int, Value::Int(42)).unwrap();
+        let b = expr.is(Property::Bool, Value::Bool(true)).unwrap();
+        let _ = expr.or(a, b).unwrap();
+
+        let requested = expr
+            .variables()
+            .requested()
+            .map(|v| *v)
+            .collect::<HashSet<_>>();
+
+        let expected = vec![Property::Int, Property::Bool]
+            .into_iter()
+            .collect::<HashSet<_>>();
+
+        assert_eq!(requested, expected);
+
+        let mut context = expr.variables();
+        context.provide(Property::Int, Value::Int(42)).unwrap();
+
+        let result = expr.eval(&Context::empty());
+        assert!(matches!(result, Ok(Evaluated::Partially(_))));
+
+        if let Ok(Evaluated::Partially(partexpr)) = result {
+            let context = partexpr.variables();
+            let requested = context.requested().map(|v| *v).collect::<Vec<_>>();
+
+            assert_eq!(
+                requested,
+                vec![Property::Bool],
+                "expression: {}, context: {}",
+                partexpr,
+                context
+            );
+        }
+    }
+
     // Tests TODO:
-    // builder methods: all failures (outofbounds)
-    // partial calcaulated
     // continue partial calculation
     // eval failures: disconnected, future reference
 }
